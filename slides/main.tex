@@ -162,46 +162,142 @@
 \end{frame}
 
 % 7 ---------------------------------------------------------------------------
-\begin{frame}{What we compared}
-  \begin{columns}[T]
+\begin{frame}{First attempt: Bayesian optimization on all 24 knobs}
+  \begin{columns}[c]
     \column{0.5\textwidth}
-      \textbf{\textcolor{accent}{Quantum circuit}} (24 knobs), trained by
+      \includegraphics[width=\textwidth]{convergence.png}
+    \column{0.48\textwidth}
+      \small
       \begin{itemize}
-        \item Bayesian optimization over all 24 knobs at once
-        \item Bayesian optimization on \textbf{6 knobs at a time}, cycling through the layers
-        \item \dots plus a short local ``polish'' step at the end
-        \item Random guessing \hfill {\small (control)}
-        \item COBYLA, a standard local optimizer \hfill {\small (control)}
+        \item Blue: BO over all 24 knobs at once, 150 trials. Red: 24 knob settings picked \textbf{completely at random}.
       \end{itemize}
-    \column{0.47\textwidth}
-      \textbf{\textcolor{accent2}{Classical models}}, trained with gradients
-      \begin{itemize}
-        \item A straight line \hfill {\small 3 weights}
-        \item A tiny neural net \hfill {\small 17 weights}
-        \item A big neural net \hfill {\small 1185 weights}
-      \end{itemize}
-      \vspace{1.2em}
-      \small Every quantum optimizer gets the same budget of circuit runs. Everything is repeated for 3 random seeds and averaged.
+      \vspace{0.3em}
+      \takeaway{They overlap. Bayesian optimization was no better than guessing. Test accuracy 79\,\% for both.}
+      \vspace{0.5em}
+      \textbf{Why?} With 24 knobs the space is enormous. 150 trials is far too few for the model to learn its shape, so its guess stays flat and ``try where the error bars are wide'' means ``try anywhere''. More trials and other selection rules did not help.
   \end{columns}
 \end{frame}
 
 % 8 ---------------------------------------------------------------------------
+\begin{frame}{Fix 1: tune six knobs at a time}
+  \small
+  \begin{columns}[T]
+    \column{0.5\textwidth}
+      \textbf{The idea}
+      \begin{itemize}
+        \item The circuit has four layers of six knobs each.
+        \item Freeze three layers. Run Bayesian optimization on the \textbf{six knobs} of the remaining one, 40 trials.
+        \item Move to the next layer. Go round all four layers three times.
+      \end{itemize}
+      \vspace{0.5em}
+      \textbf{The analogy}\\
+      Tuning a guitar one string at a time, then going round again, instead of turning all six pegs at once.
+    \column{0.46\textwidth}
+      \textbf{Why it works}
+      \begin{itemize}
+        \item In six dimensions, 40 trials is enough for the model to actually learn the shape of the landscape.
+        \item We only ever accept a change that improves the score, so it can never get worse.
+      \end{itemize}
+      \vspace{0.5em}
+      \takeaway{Same optimizer, same kind of budget: accuracy jumps from 79\,\% to 93\,\%.}
+      \vspace{0.2em}
+      Still a bit unlucky on some seeds (88 to 97\,\%): it can get stuck where no \emph{single} layer can improve things.
+  \end{columns}
+\end{frame}
+
+% 9 ---------------------------------------------------------------------------
+\begin{frame}{Fix 2: finish with a local ``polish'' (COBYLA)}
+  \begin{columns}[T]
+    \column{0.5\textwidth}
+      \textbf{What COBYLA is}
+      \begin{itemize}
+        \item A classic optimizer from 1994. \textbf{Not} Bayesian: no model, no error bars.
+        \item Looks at the scores of a few nearby knob settings, fits a \emph{flat plane} through them, and steps toward the low side.
+        \item If the step helped, take another. If it didn't, take smaller steps.
+      \end{itemize}
+      \vspace{0.3em}
+      \textbf{The analogy}\\
+      Walking downhill in fog: feel the slope under your feet, step that way, shorten your stride when you start going up.
+    \column{0.46\textwidth}
+      \textbf{How we used it}
+      \begin{itemize}
+        \item Start from the best setting Bayesian optimization found.
+        \item 150 small downhill steps.
+      \end{itemize}
+      \vspace{0.5em}
+      \takeaway{Bayesian optimization finds the right valley. COBYLA walks to the bottom of it. Result: 96\,\% on every seed.}
+      \vspace{0.3em}
+      \small Global search first, local search second. This is a standard pairing.
+  \end{columns}
+\end{frame}
+
+% 10 --------------------------------------------------------------------------
+\begin{frame}{Two sanity checks (the ``controls'')}
+  \small
+  A result only means something if you know what the dumb alternatives would have scored. Same budget of circuit runs for all.
+  \vspace{0.6em}
+  \begin{columns}[T]
+    \column{0.48\textwidth}
+      \textbf{Control 1: random guessing}
+      \begin{itemize}
+        \item Pick 24 random knob settings, score them, keep the best. Repeat 631 times.
+        \item Scored \textbf{79\,\%}.
+        \item Tells us whether an optimizer is doing anything at all.
+      \end{itemize}
+    \column{0.48\textwidth}
+      \textbf{Control 2: COBYLA on its own}
+      \begin{itemize}
+        \item The same downhill walker, but starting from a \emph{random} point, with no Bayesian optimization first.
+        \item Scored \textbf{96\,\%}, just like our full pipeline.
+        \item Tells us whether the Bayesian part was actually needed.
+      \end{itemize}
+  \end{columns}
+  \vspace{0.8em}
+  \takeaway{Control 2 is the uncomfortable one: on our noise-free simulator, the landscape was smooth enough that simply walking downhill from anywhere worked.}
+\end{frame}
+
+% 11 --------------------------------------------------------------------------
+\begin{frame}{The classical competitors}
+  \small
+  \begin{columns}[T]
+    \column{0.5\textwidth}
+      Three models, from simplest to biggest:
+      \begin{itemize}
+        \item \textbf{A straight line} (3 weights). The baseline that \emph{can't} curve.
+        \item \textbf{A tiny neural network} (17 weights). Chosen to match our circuit's 24 knobs as closely as possible. This is the fair fight.
+        \item \textbf{A big neural network} (1185 weights). Shows the ceiling when size is no object.
+      \end{itemize}
+    \column{0.46\textwidth}
+      \textbf{How they were trained}
+      \begin{itemize}
+        \item With gradients, the way neural nets normally are: backpropagation computes the slope of the error for every weight at once.
+        \item An optimizer called L-BFGS then follows that slope, using the curvature it picks up along the way to take smart, long steps.
+        \item Converges in under a second.
+      \end{itemize}
+      \vspace{0.2em}
+      \takeaway{The classical models get every advantage. Can the gradient-free circuit keep up?}
+  \end{columns}
+\end{frame}
+
+% 12 --------------------------------------------------------------------------
 \begin{frame}{Results}
   \begin{columns}[c]
     \column{0.58\textwidth}
       \includegraphics[width=\textwidth]{accuracy.png}
     \column{0.4\textwidth}
+      \small
       \begin{enumerate}
         \item \textbf{The quantum circuit reaches 96\,\%}, the same as the neural networks.
         \item BO over all 24 knobs at once was \textbf{no better than random guessing} (79\,\%).
-        \item BO on 6 knobs at a time fixed it (93\,\%); the polish step made it reliable (96\,\%).
+        \item BO on 6 knobs at a time fixed it (93\,\%); the polish made it reliable (96\,\%).
+        \item COBYLA alone also reached 96\,\%.
       \end{enumerate}
-      \vspace{0.5em}
-      \small Still 95\,\% when read out with only 256 measurement shots per point.
+      \vspace{0.2em}
+      \footnotesize 3 random seeds, 100 test points: a one-point gap is noise. Still 95\,\% when read out with only 256 measurement shots per point, as on real hardware.
   \end{columns}
 \end{frame}
 
-% 9 ---------------------------------------------------------------------------
+% 13 --------------------------------------------------------------------------
 \begin{frame}{What the models learned}
   \centering
   \includegraphics[width=\textwidth]{decision_boundaries.png}
@@ -214,18 +310,20 @@
   \end{columns}
 \end{frame}
 
-% 10 --------------------------------------------------------------------------
-\begin{frame}{Honest conclusion, and what's next}
-  \begin{itemize}
-    \item A 2-qubit circuit with 24 knobs, trained with \textbf{no gradients at all}, matched classical neural networks with 17 and 1185 weights.
-    \item Bayesian optimization only works once you keep it to a handful of knobs at a time.
-    \item \textbf{The catch:} on our noise-free simulator, the simpler local optimizer COBYLA did just as well.
-  \end{itemize}
+% 14 --------------------------------------------------------------------------
+\begin{frame}{Conclusions}
+  \begin{enumerate}
+    \item A 2-qubit circuit with 24 knobs, trained with \textbf{no gradients at all}, matched classical neural networks with 17 and 1185 weights: 96\,\% on every seed.
+    \vspace{0.3em}
+    \item Bayesian optimization \textbf{cannot handle all 24 knobs at once}. It only works when restricted to a handful of knobs at a time, and a short local polish makes it reliable.
+    \vspace{0.3em}
+    \item On a noise-free simulator, the simpler downhill walker COBYLA did just as well on its own. Bayesian optimization's real advantages are in noisy, expensive-to-evaluate settings, which our simulator does not create.
+    \vspace{0.3em}
+    \item The trained circuit survives realistic measurement: 95\,\% with 256 shots per point.
+  \end{enumerate}
   \vspace{0.6em}
-  \takeaway{Next experiment: add measurement noise to training. That is where a local optimizer should fall apart and Bayesian optimization should earn its keep.}
-  \vspace{0.8em}
-  \small Not a quantum advantage, and none expected at 2 qubits. The point was the \emph{training method}.
-  \vspace{0.6em}
+  \takeaway{Not a quantum advantage, and none expected at 2 qubits. The point was showing which training methods work when gradients are off the table.}
+  \vspace{0.4em}
   \begin{flushright}\footnotesize Code, results and a live terminal demo: \texttt{bo-vqc} repository\end{flushright}
 \end{frame}
 

@@ -6,7 +6,7 @@ classification task (two interleaving moons) and benchmarked against classical
 neural networks of comparable size.
 
 The write-up with results is in [`docs/WRITEUP.md`](docs/WRITEUP.md); the math is in [`docs/MECHANISM.md`](docs/MECHANISM.md).
-A four-page LaTeX paper is in [`paper/main.pdf`](paper/main.pdf) and a ten-slide class presentation in [`slides/main.pdf`](slides/main.pdf)
+A four-page LaTeX paper is in [`paper/main.pdf`](paper/main.pdf) and a fourteen-slide class presentation in [`slides/main.pdf`](slides/main.pdf)
 (sources `paper/main.tex`, `slides/main.tex`; build with `make -C paper` / `make -C slides`, needs [tectonic](https://tectonic-typesetting.github.io)).
 
 ## Results (3 seeds, mean ± std)
