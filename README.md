@@ -64,6 +64,20 @@ the current best loss and train/test accuracy, and an ASCII heatmap of the
 decision boundary of the best circuit so far with the data points drawn on top.
 Results are saved to `results/live_<method>_seed<k>.json` on exit.
 
+### Compare all optimizers live, in parallel
+
+```bash
+uv run python compare_live.py                          # all five methods, one process each
+uv run python compare_live.py --methods pipeline cobyla bo
+uv run python compare_live.py --quick
+```
+
+Each method trains in its own process (about 200 MB RAM and one CPU core
+each). The dashboard shows a progress bar per method with its current stage,
+the overlaid best-so-far loss curves, a status table with train/test accuracy,
+and a small decision-boundary heatmap per method with the test points drawn on
+top. Results are saved to `results/compare_seed<k>.json`.
+
 ## Layout
 
 ```
@@ -78,6 +92,7 @@ bo_vqc/
 run_experiment.py   trains everything for one seed -> results/seed_<k>.json
 aggregate.py        mean ± std across seeds, figures, results/summary.md
 train_live.py       train one method with a live terminal dashboard
+compare_live.py     train all methods in parallel processes, one comparison dashboard
 ```
 
 ## Circuit
