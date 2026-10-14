@@ -7,3 +7,9 @@ paper/*.log
 paper/*.blg
 paper/*.out
 paper/*.bbl
+slides/*.aux
+slides/*.log
+slides/*.nav
+slides/*.out
+slides/*.snm
+slides/*.toc

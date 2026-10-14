@@ -1,0 +1,232 @@
+\documentclass[aspectratio=169,11pt]{beamer}
+\usetheme{default}
+\usecolortheme{default}
+\usepackage{amsmath,bm}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{tikz}
+\usetikzlibrary{arrows.meta,positioning}
+\graphicspath{{../figures/}}
+
+% ---- look ----------------------------------------------------------------
+\definecolor{ink}{HTML}{1F2937}
+\definecolor{accent}{HTML}{5B3FA6}
+\definecolor{accent2}{HTML}{2E7D32}
+\definecolor{soft}{HTML}{F3F0FA}
+\setbeamercolor{normal text}{fg=ink}
+\setbeamercolor{structure}{fg=accent}
+\setbeamercolor{frametitle}{fg=accent,bg=white}
+\setbeamercolor{title}{fg=accent}
+\setbeamercolor{block title}{fg=white,bg=accent}
+\setbeamercolor{block body}{bg=soft}
+\setbeamerfont{frametitle}{size=\Large,series=\bfseries}
+\setbeamerfont{title}{size=\LARGE,series=\bfseries}
+\setbeamertemplate{navigation symbols}{}
+\setbeamertemplate{itemize items}[circle]
+\setbeamertemplate{footline}{%
+  \hfill\textcolor{gray}{\scriptsize\insertframenumber\,/\,\inserttotalframenumber}\hspace{1em}\vspace{0.6em}}
+\setbeamertemplate{frametitle}{\vspace{0.6em}\insertframetitle\par\vspace{-0.2em}%
+  \textcolor{accent}{\rule{\textwidth}{0.6pt}}}
+\newcommand{\takeaway}[1]{\begin{beamercolorbox}[rounded=true,sep=6pt,wd=\textwidth]{block body}\textbf{#1}\end{beamercolorbox}}
+
+\title{Bayesian-Optimized\\Variational Quantum Circuits}
+\subtitle{Teaching a 2-qubit circuit to classify data, without gradients}
+\author{Jialun Li \and Juan Vera}
+\institute{PHYS 126}
+\date{\today}
+
+\begin{document}
+
+% 1 ---------------------------------------------------------------------------
+\begin{frame}[plain]
+  \vspace{1.5em}
+  \titlepage
+\end{frame}
+
+% 2 ---------------------------------------------------------------------------
+\begin{frame}{The question}
+  \vspace{0.5em}
+  \begin{center}
+    \Large Can a \textbf{tiny quantum circuit} learn to classify data\\
+    as well as a \textbf{small neural network}\dots\\[0.6em]
+    \textcolor{accent}{\textbf{\dots if we train it without gradients?}}
+  \end{center}
+  \vspace{1.2em}
+  \begin{columns}[T]
+    \column{0.48\textwidth}
+      \textbf{Why ``without gradients''?}
+      \begin{itemize}
+        \item Neural nets are trained by following the slope of the error.
+        \item On a real quantum computer, that slope is \emph{expensive and noisy} to measure.
+        \item So people want optimizers that only need the score, not the slope.
+      \end{itemize}
+    \column{0.48\textwidth}
+      \textbf{What we did}
+      \begin{itemize}
+        \item Built a 2-qubit circuit in Qiskit.
+        \item Trained it with \textbf{Bayesian optimization}.
+        \item Raced it against classical neural networks on the same task.
+      \end{itemize}
+  \end{columns}
+\end{frame}
+
+% 3 ---------------------------------------------------------------------------
+\begin{frame}{The task: two moons}
+  \begin{columns}[c]
+    \column{0.5\textwidth}
+      \includegraphics[width=\textwidth]{dataset.png}
+    \column{0.47\textwidth}
+      \begin{itemize}
+        \item 300 points in two interleaved crescents, red and blue.
+        \item Goal: given a new point, say which colour it is.
+        \item 200 points to learn from, 100 held back to test on.
+      \end{itemize}
+      \vspace{0.8em}
+      \takeaway{No straight line separates them. A straight-line classifier scores 84\,\%. Everything above that needs a \emph{curved} boundary.}
+  \end{columns}
+\end{frame}
+
+% 4 ---------------------------------------------------------------------------
+\begin{frame}{What a quantum classifier is}
+  \centering
+  \includegraphics[width=0.72\textwidth]{circuit.png}\\[-0.3em]
+  {\footnotesize two of the four layers shown}
+  \vspace{0.2em}
+  \begin{columns}[T]
+    \column{0.55\textwidth}
+      \small
+      \begin{enumerate}
+        \item Rotate each qubit by an angle that depends on the data point $(x_1, x_2)$.
+        \item Rotate again by \textbf{trainable} angles $\theta$ (the ``knobs'').
+        \item Entangle the two qubits. Repeat four times.
+        \item Measure qubit 0.
+      \end{enumerate}
+    \column{0.42\textwidth}
+      \takeaway{Output: a number $f \in [-1, 1]$.\\ $f > 0 \Rightarrow$ red, \quad $f < 0 \Rightarrow$ blue.}
+      \vspace{0.5em}
+      \small 24 knobs in total. \textbf{Training} = turning the knobs until the sign is right for as many points as possible.
+  \end{columns}
+\end{frame}
+
+% 5 ---------------------------------------------------------------------------
+\begin{frame}{Why we can't just use gradients}
+  \small
+  \begin{columns}[T]
+    \column{0.5\textwidth}
+      \textbf{Neural network}
+      \begin{itemize}
+        \item Backpropagation: one backward pass gives the slope for \emph{every} weight.
+        \item Cost $\approx$ one forward pass.
+      \end{itemize}
+      \vspace{0.6em}
+      \textbf{Quantum circuit}
+      \begin{itemize}
+        \item You can't look inside the state without destroying it, so there is no backward pass.
+        \item The slope for one knob costs two extra full runs:
+          \[ \frac{\partial f}{\partial \theta} = \tfrac{1}{2}\big[f(\theta + \tfrac{\pi}{2}) - f(\theta - \tfrac{\pi}{2})\big] \]
+        \item 24 knobs $\Rightarrow$ \textbf{48 extra runs} per data point per step, each one noisy.
+      \end{itemize}
+    \column{0.46\textwidth}
+      \vspace{1.2em}
+      \begin{center}
+      \begin{tikzpicture}[node distance=5mm, >=Latex, font=\small]
+        \node[draw=accent, thick, rounded corners, fill=soft, minimum width=2.9cm, minimum height=1.3cm, align=center] (box) {\textbf{quantum circuit}\\ \scriptsize (treated as a black box)};
+        \node[left=of box, align=center] (in) {24 knob\\settings};
+        \node[right=of box, align=center] (out) {one\\score};
+        \draw[->, thick] (in) -- (box);
+        \draw[->, thick] (box) -- (out);
+      \end{tikzpicture}
+      \end{center}
+      \vspace{0.6em}
+      \takeaway{So we treat it as a black box: knobs in, score out. We need an optimizer that works from scores alone.}
+  \end{columns}
+\end{frame}
+
+% 6 ---------------------------------------------------------------------------
+\begin{frame}{Bayesian optimization in plain words}
+  \begin{columns}[c]
+    \column{0.5\textwidth}
+      \includegraphics[width=\textwidth]{gp_intuition.png}
+    \column{0.47\textwidth}
+      \small
+      You can only afford a few hundred trials. After each one:
+      \begin{enumerate}
+        \item Fit a smooth guess through every result so far, \emph{with error bars}.
+        \item Try next wherever the guess is low \textbf{or} the error bars are wide.
+      \end{enumerate}
+      \vspace{0.2em}
+      That trade-off has a name, \emph{Expected Improvement}:
+      \[ \mathrm{EI} = \underbrace{(\mathcal{L}^* - \mu)\,\Phi(z)}_{\text{probably good}} + \underbrace{\sigma\,\varphi(z)}_{\text{haven't looked}} \]
+      \takeaway{Every trial is chosen by the model, not by a fixed rule.}
+  \end{columns}
+\end{frame}
+
+% 7 ---------------------------------------------------------------------------
+\begin{frame}{What we compared}
+  \begin{columns}[T]
+    \column{0.5\textwidth}
+      \textbf{\textcolor{accent}{Quantum circuit}} (24 knobs), trained by
+      \begin{itemize}
+        \item Bayesian optimization over all 24 knobs at once
+        \item Bayesian optimization on \textbf{6 knobs at a time}, cycling through the layers
+        \item \dots plus a short local ``polish'' step at the end
+        \item Random guessing \hfill {\small (control)}
+        \item COBYLA, a standard local optimizer \hfill {\small (control)}
+      \end{itemize}
+    \column{0.47\textwidth}
+      \textbf{\textcolor{accent2}{Classical models}}, trained with gradients
+      \begin{itemize}
+        \item A straight line \hfill {\small 3 weights}
+        \item A tiny neural net \hfill {\small 17 weights}
+        \item A big neural net \hfill {\small 1185 weights}
+      \end{itemize}
+      \vspace{1.2em}
+      \small Every quantum optimizer gets the same budget of circuit runs. Everything is repeated for 3 random seeds and averaged.
+  \end{columns}
+\end{frame}
+
+% 8 ---------------------------------------------------------------------------
+\begin{frame}{Results}
+  \begin{columns}[c]
+    \column{0.58\textwidth}
+      \includegraphics[width=\textwidth]{accuracy.png}
+    \column{0.4\textwidth}
+      \begin{enumerate}
+        \item \textbf{The quantum circuit reaches 96\,\%}, the same as the neural networks.
+        \item BO over all 24 knobs at once was \textbf{no better than random guessing} (79\,\%).
+        \item BO on 6 knobs at a time fixed it (93\,\%); the polish step made it reliable (96\,\%).
+      \end{enumerate}
+      \vspace{0.5em}
+      \small Still 95\,\% when read out with only 256 measurement shots per point.
+  \end{columns}
+\end{frame}
+
+% 9 ---------------------------------------------------------------------------
+\begin{frame}{What the models learned}
+  \centering
+  \includegraphics[width=\textwidth]{decision_boundaries.png}
+  \vspace{0.4em}
+  \begin{columns}[T]
+    \column{0.48\textwidth}
+      \small Left to right: the boundary goes from a blob (BO on all 24 knobs) to a curve that hugs the moons (BO on 6 at a time + polish).
+    \column{0.48\textwidth}
+      \small The quantum boundary is \textbf{smooth and wavy}; the neural net's is made of \textbf{straight segments}. Same problem, different shapes.
+  \end{columns}
+\end{frame}
+
+% 10 --------------------------------------------------------------------------
+\begin{frame}{Honest conclusion, and what's next}
+  \begin{itemize}
+    \item A 2-qubit circuit with 24 knobs, trained with \textbf{no gradients at all}, matched classical neural networks with 17 and 1185 weights.
+    \item Bayesian optimization only works once you keep it to a handful of knobs at a time.
+    \item \textbf{The catch:} on our noise-free simulator, the simpler local optimizer COBYLA did just as well.
+  \end{itemize}
+  \vspace{0.6em}
+  \takeaway{Next experiment: add measurement noise to training. That is where a local optimizer should fall apart and Bayesian optimization should earn its keep.}
+  \vspace{0.8em}
+  \small Not a quantum advantage, and none expected at 2 qubits. The point was the \emph{training method}.
+  \vspace{0.6em}
+  \begin{flushright}\footnotesize Code, results and a live terminal demo: \texttt{bo-vqc} repository\end{flushright}
+\end{frame}
+
+\end{document}
