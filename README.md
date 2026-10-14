@@ -49,6 +49,21 @@ uv run python run_experiment.py --seed 2
 uv run python aggregate.py                         # table -> results/summary.md, figures -> figures/
 ```
 
+### Watch training live in the terminal
+
+```bash
+uv run python train_live.py                        # main pipeline: block BO -> COBYLA polish
+uv run python train_live.py --method bo            # full-space Bayesian optimization
+uv run python train_live.py --method cobyla        # or: block, random
+uv run python train_live.py --quick --seed 1       # small budget, ~10 s
+```
+
+The dashboard redraws after every circuit-loss evaluation: a progress bar with
+the current optimizer stage, the loss curve with best-so-far and stage markers,
+the current best loss and train/test accuracy, and an ASCII heatmap of the
+decision boundary of the best circuit so far with the data points drawn on top.
+Results are saved to `results/live_<method>_seed<k>.json` on exit.
+
 ## Layout
 
 ```
@@ -59,8 +74,10 @@ bo_vqc/
   classical.py  logistic regression + two scikit-learn MLPs
   shots.py      finite-shot evaluation of a trained circuit on AerSimulator
   plots.py      figures
+  live.py       rich + plotext terminal dashboard used by train_live.py
 run_experiment.py   trains everything for one seed -> results/seed_<k>.json
 aggregate.py        mean ± std across seeds, figures, results/summary.md
+train_live.py       train one method with a live terminal dashboard
 ```
 
 ## Circuit

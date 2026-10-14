@@ -14,22 +14,24 @@ from skopt import gp_minimize
 from skopt.space import Real
 
 
-def _trace(vqc, X, y, history):
-    """Wrap loss so every evaluation is recorded as (loss, running-best)."""
+def _trace(vqc, X, y, history, callback=None):
+    """Wrap loss so every evaluation is recorded; callback(loss, theta) if given."""
     def f(theta):
         l = vqc.loss(theta, X, y)
         history.append(l)
+        if callback is not None:
+            callback(l, np.asarray(theta, dtype=float))
         return l
     return f
 
 
 def bayesian_optimize(vqc, X, y, n_calls=150, n_initial_points=25, seed=0,
-                      acq_func="EI", bound=np.pi, verbose=False):
+                      acq_func="EI", bound=np.pi, verbose=False, callback=None):
     space = [Real(-bound, bound, name=f"t{i}") for i in range(vqc.n_params)]
     history = []
     t0 = time.time()
     res = gp_minimize(
-        _trace(vqc, X, y, history), space,
+        _trace(vqc, X, y, history, callback), space,
         n_calls=n_calls, n_initial_points=n_initial_points,
         initial_point_generator="lhs", acq_func=acq_func,
         random_state=seed, noise=1e-10, verbose=verbose,
@@ -40,42 +42,42 @@ def bayesian_optimize(vqc, X, y, n_calls=150, n_initial_points=25, seed=0,
     )
 
 
-def random_search(vqc, X, y, n_calls=150, seed=0, bound=np.pi):
+def random_search(vqc, X, y, n_calls=150, seed=0, bound=np.pi, callback=None):
     rng = np.random.default_rng(seed)
     history, best, best_theta = [], np.inf, None
+    f = _trace(vqc, X, y, history, callback)
     t0 = time.time()
     for _ in range(n_calls):
         theta = rng.uniform(-bound, bound, vqc.n_params)
-        l = vqc.loss(theta, X, y)
-        history.append(l)
+        l = f(theta)
         if l < best:
             best, best_theta = l, theta
     return dict(name="Random search", theta=best_theta, loss=best, history=np.array(history),
                 n_calls=n_calls, seconds=time.time() - t0)
 
 
-def cobyla_from_random(vqc, X, y, n_calls=150, seed=0, bound=np.pi):
+def cobyla_from_random(vqc, X, y, n_calls=150, seed=0, bound=np.pi, callback=None):
     rng = np.random.default_rng(seed)
     theta0 = rng.uniform(-bound, bound, vqc.n_params)
     history = []
     t0 = time.time()
-    res = minimize(_trace(vqc, X, y, history), theta0, method="COBYLA",
+    res = minimize(_trace(vqc, X, y, history, callback), theta0, method="COBYLA",
                    options=dict(maxiter=n_calls, rhobeg=0.5))
     return dict(name="COBYLA (random init)", theta=res.x, loss=float(res.fun),
                 history=np.array(history), n_calls=len(history), seconds=time.time() - t0)
 
 
-def local_polish(vqc, X, y, theta0, n_calls=100):
+def local_polish(vqc, X, y, theta0, n_calls=100, callback=None):
     history = []
     t0 = time.time()
-    res = minimize(_trace(vqc, X, y, history), np.asarray(theta0), method="COBYLA",
+    res = minimize(_trace(vqc, X, y, history, callback), np.asarray(theta0), method="COBYLA",
                    options=dict(maxiter=n_calls, rhobeg=0.2))
     return dict(name="BO + COBYLA polish", theta=res.x, loss=float(res.fun),
                 history=np.array(history), n_calls=len(history), seconds=time.time() - t0)
 
 
 def block_bayesian_optimize(vqc, X, y, n_sweeps=3, calls_per_block=40, n_initial_points=10,
-                            seed=0, bound=np.pi, block_size=None, verbose=False):
+                            seed=0, bound=np.pi, block_size=None, verbose=False, callback=None):
     """Block-coordinate Bayesian optimization.
 
     GP-based BO scales poorly past ~10-15 dimensions, so instead of modelling
@@ -92,6 +94,8 @@ def block_bayesian_optimize(vqc, X, y, n_sweeps=3, calls_per_block=40, n_initial
     history = []
     best = vqc.loss(theta, X, y)
     history.append(best)
+    if callback is not None:
+        callback(best, theta.copy())
     sweep_log = []
     t0 = time.time()
     for sweep in range(n_sweeps):
@@ -100,6 +104,8 @@ def block_bayesian_optimize(vqc, X, y, n_sweeps=3, calls_per_block=40, n_initial
                 t = theta.copy(); t[idx] = sub
                 l = vqc.loss(t, X, y)
                 history.append(l)
+                if callback is not None:
+                    callback(l, t)
                 return l
             space = [Real(-bound, bound, name=f"t{i}") for i in idx]
             res = gp_minimize(
