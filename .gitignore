@@ -2,3 +2,8 @@
 __pycache__/
 *.pyc
 results/log_*.txt
+paper/*.aux
+paper/*.log
+paper/*.blg
+paper/*.out
+paper/*.bbl

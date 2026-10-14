@@ -6,6 +6,7 @@ classification task (two interleaving moons) and benchmarked against classical
 neural networks of comparable size.
 
 The write-up with results is in [`docs/WRITEUP.md`](docs/WRITEUP.md); the math is in [`docs/MECHANISM.md`](docs/MECHANISM.md).
+A four-page LaTeX paper is in [`paper/main.pdf`](paper/main.pdf) (source `paper/main.tex`, build with `make -C paper`, needs [tectonic](https://tectonic-typesetting.github.io)).
 
 ## Results (3 seeds, mean ± std)
 
@@ -93,6 +94,8 @@ run_experiment.py   trains everything for one seed -> results/seed_<k>.json
 aggregate.py        mean ± std across seeds, figures, results/summary.md
 train_live.py       train one method with a live terminal dashboard
 compare_live.py     train all methods in parallel processes, one comparison dashboard
+paper/              LaTeX mini-paper (main.tex, refs.bib, main.pdf)
+docs/               markdown write-up and mechanism notes
 ```
 
 ## Circuit
