@@ -1,0 +1,14 @@
+[project]
+name = "bo-vqc"
+version = "0.1.0"
+description = "Bayesian-optimized variational quantum circuits vs classical NNs on a toy task"
+requires-python = ">=3.12"
+dependencies = [
+    "matplotlib>=3.11.2",
+    "numpy>=2.5.4",
+    "qiskit>=2.5.2",
+    "qiskit-aer>=0.17.2",
+    "scikit-learn>=1.9.1",
+    "scikit-optimize>=0.10.2",
+    "scipy>=1.18.1",
+]
