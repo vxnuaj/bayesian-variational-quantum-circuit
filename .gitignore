@@ -1,0 +1,15 @@
+.venv/
+__pycache__/
+*.pyc
+results/log_*.txt
+paper/*.aux
+paper/*.log
+paper/*.blg
+paper/*.out
+paper/*.bbl
+slides/*.aux
+slides/*.log
+slides/*.nav
+slides/*.out
+slides/*.snm
+slides/*.toc
